@@ -22,6 +22,10 @@ class GlobalCfg:
         self.num_envs = args.num_envs
         self.logdir = args.logdir
 
+        self.robot_type = "realman"  
+        self.control_type = "position"
+        self.obs_type = None
+
 class GymCfg:
     """仿真器配置"""
 
@@ -42,16 +46,16 @@ class RobotCfg:
 
     def __init__(self,global_cfg):
         # 控制相关参数
-        self.robot_type = "realman"  # 可选 "frankaLinker", "realman"
-        self.control_type = "position"
-        self.obs_type = "state"
+        self.robot_type = global_cfg.robot_type  
+        self.control_type = global_cfg.control_type 
+        self.obs_type = global_cfg.obs_type
         self.block_gripper = True
-        self.num_actions = 29 #18/
+        self.num_actions = 29 #18
         self.num_obs = 46 #75
         self.robot_num_dofs = 29
         self.num_envs = global_cfg.num_envs  # 修改其他配置一致
-        self.control_type_sim = "position"
-        self.obs_type_sim = "state"
+        self.control_type_sim = global_cfg.control_type
+        self.obs_type_sim = global_cfg.obs_type
 
         # 模型路径与姿态
         self.asset = "/home/ymy/note/diffusion_policy_frame/GraspDiffuserX/NexusMinds_RL/env/assets"
@@ -132,6 +136,7 @@ class TaskCfg:
 
         self.reward_type = "dense"
         self.distance_threshold = 0.02
+        self.robot_type = global_cfg.robot_type  # 修改其他配置一致
 
         # 定义所有的参数，后续根据那公式划分一下公式
         self.c1 = 1
@@ -146,6 +151,7 @@ class TaskCfg:
         self.c10 = 2
         self.c11 = 100
         self.c12 = 2
+        self.c13 = 2
 
         self.alpha_mid =1.5
         self.alpha_pos =1.5
@@ -164,6 +170,8 @@ class TaskCfg:
             # "hand_down": self.c10,
             # #"success":self.c11,
             # "hand_align":self.c12
+            #"penalty_rnegtive": self.c13
+            "gripper_collision_reset": self.c7
         }
 
 
@@ -178,8 +186,9 @@ class AllCfg:
         self.max_episode_length = 800
         self.max_episode_length_s = 4.0  # 秒数形式（用于日志统计）
         self.decimation = 4
-        self.control_type_sim = "position"
-        self.obs_type_sim = "state"
+        self.control_type_sim = global_cfg.control_type
+        self.obs_type_sim = global_cfg.obs_type
+        self.robot_type_sim = global_cfg.robot_type
 
 
 class LinkGraspCfg:

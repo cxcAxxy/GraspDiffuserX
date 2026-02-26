@@ -135,6 +135,8 @@ class SingleFieldLinearNormalizer(DictOfTensorMixin):
             if not isinstance(x, torch.Tensor):
                 x = torch.from_numpy(x)
             x = x.flatten()
+            # clean up invalid values to avoid RuntimeWarning: invalid value encountered in cast
+            x = torch.nan_to_num(x, nan=0.0, posinf=1.0, neginf=-1.0)
             return x
         
         # check
@@ -142,12 +144,32 @@ class SingleFieldLinearNormalizer(DictOfTensorMixin):
             assert x.shape == scale.shape
             assert x.dtype == scale.dtype
         
-        params_dict = nn.ParameterDict({
-            'scale': to_tensor(scale),
-            'offset': to_tensor(offset),
-            'input_stats': nn.ParameterDict(
-                dict_apply(input_stats_dict, to_tensor))
-        })
+        # In PyTorch 1.10, nn.ParameterDict cannot hold nested ParameterDicts
+        # and nn.ModuleDict cannot hold Parameters directly.
+        # We use a custom nn.Module to hold mixed types.
+        class MixedParams(nn.Module):
+            def __init__(self, scale, offset, input_stats):
+                super().__init__()
+                self.register_parameter('scale', nn.Parameter(to_tensor(scale), requires_grad=False))
+                self.register_parameter('offset', nn.Parameter(to_tensor(offset), requires_grad=False))
+                self.input_stats = input_stats
+            
+            def __getitem__(self, key):
+                return getattr(self, key)
+
+            def __iter__(self):
+                yield 'scale'
+                yield 'offset'
+                yield 'input_stats'
+            
+            def keys(self):
+                return list(self)
+
+        input_stats_module = nn.ParameterDict(
+            dict_apply(input_stats_dict, lambda x: nn.Parameter(to_tensor(x), requires_grad=False)))
+            
+        params_dict = MixedParams(scale, offset, input_stats_module)
+
         return cls(params_dict)
 
     @classmethod

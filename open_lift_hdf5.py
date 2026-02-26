@@ -1,7 +1,7 @@
 import h5py
 
 # 文件路径
-hdf5_file_path = "data/robomimic/datasets/lift/ph/dataset1.hdf5"
+hdf5_file_path = "data/robomimic/datasets/lift/ph/dataset.hdf5"
 # hdf5_file_path = "real_data/dataset.hdf5"
 
 def print_hdf5_structure(name, obj):

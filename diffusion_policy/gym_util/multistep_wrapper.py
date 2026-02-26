@@ -3,6 +3,7 @@ from gym import spaces
 import numpy as np
 from collections import defaultdict, deque
 import dill
+import torch
 
 def stack_repeated(x, n):
     return np.repeat(np.expand_dims(x,axis=0),n,axis=0)
@@ -107,6 +108,12 @@ class MultiStepWrapper(gym.Wrapper):
         """
         action: (n_envs, n_action_steps, action_dim)
         """
+        if torch.is_tensor(action):
+            action = action.detach().cpu().numpy()
+
+        current_step_rewards = [[] for _ in range(self.n_envs)]
+        last_privileged_obs = None
+        last_info = {}
 
         for t in range(self.n_action_steps):
 
@@ -114,17 +121,21 @@ class MultiStepWrapper(gym.Wrapper):
             act = action[:, t]  # (n_envs, action_dim)
 
             # 已完成 env 不执行
-            act[self.done] = 0.0
+            # act[self.done] = 0.0 # Disabled: Let the env handle logic or auto-reset
 
-            obs, reward, done, info = super().step(act)
+            obs, privileged_obs, reward, done, info = super().step(act)
+            last_privileged_obs = privileged_obs
+            last_info = info
 
             for i in range(self.n_envs):
 
-                if self.done[i]:
-                    continue
+                # if self.done[i]:
+                #     continue
+                # Removed check: Record data even if done (handling auto-reset in vector envs)
 
                 self.obs[i].append(self._slice_obs(obs, i))
-                self.reward[i].append(reward[i])
+                self.reward[i].append(reward[i]) # Keep history
+                current_step_rewards[i].append(reward[i]) # Current step accumulator
                 self.step_count[i] += 1
 
                 # 超时
@@ -137,12 +148,28 @@ class MultiStepWrapper(gym.Wrapper):
 
         observation = self._get_obs()
 
-        reward = self._aggregate_rewards()
+        # Aggregate rewards for THIS step call only
+        rewards = []
+        for i in range(self.n_envs):
+            r_list = current_step_rewards[i]
+            if len(r_list) == 0:
+                rewards.append(0.0)
+            else:
+                if self.reward_agg_method == 'max':
+                    rewards.append(np.max(r_list))
+                elif self.reward_agg_method == 'sum':
+                    rewards.append(np.sum(r_list))
+                elif self.reward_agg_method == 'mean':
+                    rewards.append(np.mean(r_list))
+                else:
+                    raise NotImplementedError
+        
+        reward = np.array(rewards)
         done = np.array(self.done)
 
-        info = {}
+        info = last_info
 
-        return observation, reward, done, info
+        return observation, last_privileged_obs, reward, done, info
 
     def _slice_obs(self, obs, idx):
         if isinstance(obs, dict):

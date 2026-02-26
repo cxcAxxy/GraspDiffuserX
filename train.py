@@ -13,6 +13,11 @@ import hydra
 from omegaconf import OmegaConf
 import pathlib
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
+import warnings
+import numpy as np
+
+# 忽略 numpy 的 cast 警告（通常由数据归一化时的无效值引起，不影响训练）
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in cast")
 
 # allows arbitrary python code execution in configs using the ${eval:''} resolver
 OmegaConf.register_new_resolver("eval", eval, replace=True)
